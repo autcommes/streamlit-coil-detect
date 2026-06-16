@@ -43,6 +43,11 @@ FONT_PATH = os.environ.get("COIL_FONT_PATH") or _default_font_path()
 GREEN = (0, 255, 0)
 CYAN = (0, 200, 200)
 
+# 自动降采样阈值：最长边超过此值时先 cv2.resize 再处理。
+# 目的：1) 让 Streamlit Cloud 1GB 内存扛得住大图；
+#       2) 让默认参数（按 ~2K 图调过）在 4K/7K 输入下也能直接用。
+MAX_PROCESS_DIM = int(os.environ.get("COIL_MAX_DIM", "2000"))
+
 
 @dataclass
 class Params:
@@ -115,14 +120,31 @@ def detect_boards(mask_raw, h_img):
 
 
 def process_image(img_bgr: np.ndarray, p: Params = DEFAULTS) -> Tuple[np.ndarray, dict]:
-    """输入 BGR ndarray + 参数，输出 (结果图BGR, 元信息)。"""
+    """输入 BGR ndarray + 参数，输出 (结果图BGR, 元信息)。
+
+    大图（最长边 > MAX_PROCESS_DIM）会被自动等比降采样到处理尺寸再做检测，
+    保证 Streamlit Cloud 不 OOM、且参数表跨分辨率通用。
+    返回的可视化结果就是处理尺寸（清晰、易下载），但 info 里的坐标/尺寸
+    都已还原到原图坐标系，便于对应到原图位置。
+    """
     if img_bgr is None or img_bgr.size == 0:
         return img_bgr, {"contour_count": 0, "center_x": 0, "center_y": 0,
                          "width": 0, "height": 0, "error": "空图像"}
 
-    h_img, w_img = img_bgr.shape[:2]
-    hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
-    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    h_orig, w_orig = img_bgr.shape[:2]
+    longest = max(h_orig, w_orig)
+    if longest > MAX_PROCESS_DIM:
+        scale = MAX_PROCESS_DIM / longest
+        proc = cv2.resize(img_bgr, None, fx=scale, fy=scale,
+                          interpolation=cv2.INTER_AREA)
+    else:
+        scale = 1.0
+        proc = img_bgr
+
+    h_img, w_img = proc.shape[:2]
+    inv_scale = 1.0 / scale  # 处理图坐标 → 原图坐标
+    hsv = cv2.cvtColor(proc, cv2.COLOR_BGR2HSV)
+    gray = cv2.cvtColor(proc, cv2.COLOR_BGR2GRAY)
     result = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
     board_lo = np.array([p.board_h_min, p.board_s_min, p.board_v_min])
@@ -134,7 +156,10 @@ def process_image(img_bgr: np.ndarray, p: Params = DEFAULTS) -> Tuple[np.ndarray
     rects, bx1, bx2, b1y1, b2y2 = detect_boards(mask_raw, h_img)
 
     info = {"contour_count": 0, "center_x": 0.0, "center_y": 0.0,
-            "width": w_img, "height": h_img}
+            "width": w_orig, "height": h_orig}
+    if scale != 1.0:
+        info["downscaled_to"] = f"{w_img}x{h_img}"
+        info["scale"] = round(scale, 4)
 
     if not rects:
         info["error"] = "未检测到板（请调宽板 HSV 范围）"
@@ -166,11 +191,14 @@ def process_image(img_bgr: np.ndarray, p: Params = DEFAULTS) -> Tuple[np.ndarray
     cy = (b1y1 + b2y2) / 2
     cv2.drawMarker(result, (int(cx), int(cy)), GREEN, cv2.MARKER_CROSS, 30, 2)
 
-    label = f"匹配框中心:({cx:.2f},{cy:.2f})"
+    cx_orig = cx * inv_scale
+    cy_orig = cy * inv_scale
+    label = f"匹配框中心:({cx_orig:.2f},{cy_orig:.2f})"
     result = put_cn_text(result, label,
                          (int(cx) + 10, int(cy) - 36), font_size=28, color=GREEN)
-    result = put_cn_text(result, f"{w_img} x {h_img}",
+    result = put_cn_text(result, f"{w_orig} x {h_orig}",
                          (w_img - 210, h_img - 40), font_size=26, color=CYAN)
 
-    info.update({"contour_count": len(detail), "center_x": cx, "center_y": cy})
+    info.update({"contour_count": len(detail),
+                 "center_x": cx_orig, "center_y": cy_orig})
     return result, info

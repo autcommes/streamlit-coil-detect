@@ -174,6 +174,8 @@ with col_right:
             f"匹配框中心: ({info['center_x']:.2f}, {info['center_y']:.2f})　"
             f"图像尺寸: {info['width']} × {info['height']}"
         )
+        if "downscaled_to" in info:
+            msg += f"　🔻 已降采样至 {info['downscaled_to']} 处理（坐标已还原到原图）"
         if "error" in info:
             st.warning(info["error"])
         st.markdown(msg)
