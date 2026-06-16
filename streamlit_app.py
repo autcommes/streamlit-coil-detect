@@ -131,9 +131,9 @@ with col_left:
         file_name=PARAMS_JSON,
         mime="application/json",
         type="primary",
-        use_container_width=True,
+        width="stretch",
     )
-    if btn_reset.button("恢复默认", use_container_width=True):
+    if btn_reset.button("恢复默认", width="stretch"):
         _reset_to_defaults()
         st.rerun()
 
@@ -167,7 +167,7 @@ with col_right:
         result_bgr, info = process_image(img_bgr, p)
         result_rgb = cv2.cvtColor(result_bgr, cv2.COLOR_BGR2RGB)
 
-        st.image(result_rgb, caption="检测结果", use_container_width=True)
+        st.image(result_rgb, caption="检测结果", width="stretch")
 
         msg = (
             f"轮廓数: **{info['contour_count']}**　"
