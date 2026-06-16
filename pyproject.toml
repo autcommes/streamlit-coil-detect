@@ -1,0 +1,15 @@
+[project]
+name = "streamlit-coil-detect"
+version = "0.1.0"
+description = "橙色线圈轮廓检测 — Streamlit 调参界面"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit>=1.40.0",
+    "numpy>=2.0.0",
+    "opencv-python-headless>=4.10.0",
+    "pillow>=11.0.0",
+]
+
+[tool.uv]
+package = false

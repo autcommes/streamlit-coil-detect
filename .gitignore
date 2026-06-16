@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# uv / venv
+.venv/
+.env
+
+# IDE / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 运行时
+params.json
+*.log
+
+# 用户图片（避免测试图被提交，docs/ 下的示例图除外）
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.webp
+!docs/*.png
+!docs/*.jpg
